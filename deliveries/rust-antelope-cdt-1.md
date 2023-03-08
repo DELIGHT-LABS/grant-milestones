@@ -18,7 +18,7 @@
 
  This report summarizes research into the feasibility of using the Rust programming language to implement EOS Antelope CDT (Contract Development Toolkit). We analyzed this approach in depth across three key areas.
 
- The first point is whether EOSVM can run all WebAssembly (WASM) specifications. We believe this could demonstrate the potential of utilizing CosmWasm. Next, we compared CosmWasm and Antelope CDT. Finally, we investigated whether Wasmer could be integrated into the core to ensure CosmWasm-Wasmer integration in case CosmWasm does not run on EOSVM.
+ The first point is whether EOSVM can run all WebAssembly (WASM) specifications. We believe this could demonstrate the potential of utilizing CosmWasm. Next, we compared CosmWasm and Antelope CDT in order to check which could be improved and which needed more. Finally, we investigated whether Wasmer could be integrated into the core to ensure CosmWasm-Wasmer integration in case CosmWasm does not run on EOSVM.
 
  In summary, we’ve confirmed that Rust CDT can be built on EOSVM and it also can leverage Cosmwasm to its development. Based on the analysis in this report, we would love to move forward with the development of Rust CDT. We aim to develop Rust CDT on top of EOSVM, but also want to leave room for Wasmer integration in case of unforeseen constraints. The benefits of a Rust-based smart contract platform, including improved security and developer productivity, outweigh the costs of implementation. Rust CDT would provide EOS developers with more options and flexibility, and help EOS remain competitive as blockchain technologies continue to evolve.
 
@@ -33,9 +33,9 @@
 
 #### No imports other than function
 
- All imports except for function import has been restricted for guarded pointer in EOSVM. This limitation means that table, mem, and global types could not be imported in EOSVM. Since Wasmer support all imports including function it can be a barrier to utilize Cosmwasm. Our research concluded that Cosmwasm only supports imports defined in Cosmwasm VM and they consists of functions so it can be executed fully on EOSVM. The below code line represent the supported imports in Cosmwasm, which contains functions only.
-
-- [https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/compatibility.rs#L12](https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/compatibility.rs#L12)
+ All imports except for function import has been restricted for guarded pointer in EOSVM. This limitation means that table, mem, and global types could not be imported in EOSVM. Since Wasmer support all imports including function it can be a barrier to utilize Cosmwasm.
+ 
+ Our research concluded that Cosmwasm only supports imports defined in Cosmwasm VM and they consists of functions so it can be executed fully on EOSVM. The code line [(1)](#reference) represents the supported imports in Cosmwasm, which contains functions only.
 
 #### Other unique implementations
 
@@ -45,16 +45,13 @@
 - global’s content
 - block/if/loop’s returns
 
- Though Wasmer hasn’t any limit regarding them, Cosmwasm VM disables “allow_feature_simd” option by default so that only single instruction is unable to accept multiple data without setting the option explicitly. The source code for the "allow_feature_simd" option is as follows.
+ Though Wasmer has not any limit regarding them, Cosmwasm VM disables “allow_feature_simd” option by default so that only single instruction is unable to accept multiple data without setting the option explicitly. The source code for the "allow_feature_simd" option is as follows. [(2)](#reference) [(3)](#reference)
 
-- [https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/wasm_backend/gatekeeper.rs#L64](https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/wasm_backend/gatekeeper.rs#L64)
-- [https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/wasm_backend/gatekeeper.rs#L498](https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/wasm_backend/gatekeeper.rs#L498)
-
- The reason it was prevented on EOSVM remains unclear but we delved deeply into quite amount of text formatted WASM file contents from Cosmwasm directly in order to firmly ensure that it does not influence the implementation. The tested Cosmwasm contract source codes are as follows and they all meet the condition for this unique validation.
+ The reason it was prevented on EOSVM remains unclear but we also delved deeply into quite amount of text formatted WASM file contents from Cosmwasm directly in order to firmly ensure that it does not influence the implementation. The tested Cosmwasm contract source codes are as follows and they all meet the condition for this unique validation.
 
 - https://github.com/CosmWasm/cw-template
 - https://github.com/terraswap/terraswap
-- [https://github.com/CosmWasm/cosmwasm/tree/main/packages/vm/testdata](https://github.com/CosmWasm/cosmwasm/tree/main/packages/vm/testdata)
+- https://github.com/CosmWasm/cosmwasm/tree/main/packages/vm/testdata
 
 ### Case 2: The comparison between Cosmwasm and Antelope CDT
 
@@ -72,11 +69,10 @@
 #### Input parameter description
 
 - Antelope CDT
-  - By [this line](https://github.com/AntelopeIO/eos-vm/blob/main/include/eosio/vm/execution_context.hpp#L287), the args are encoded or serialized into EOSVM-native type
+  - With the line [(4)](#reference), the args are encoded or serialized into EOSVM-native type
     - Although it could be uint32_t, uint64_t, etc, we are not sure that the value could be changed into the special standard of EOSVM
 - Cosmwasm
-  - According to [the code](https://github.com/CosmWasm/wasmvm/blob/main/libwasmvm/src/calls.rs#L488-L528)
-
+  - According to the source code [(5)](#reference)
     ```rust
     fn call_3_args(
         vm_fn: VmFn3Args,
@@ -130,19 +126,19 @@
 
 - Antelope CDT
   - Deserialization within the contract by EOSVM spec
-  - Light implementation & light size of the contract, but not standard logic
+  - Light implementation and size of the contract
 - Cosmwasm based
-  - Serialization & deserialization logic from [Serde](https://serde.rs/)
+  - Serialization & deserialization logic from Serde [(6)](#reference)
   - The contract contains Serde logic
   - The contract takes a serialized data and unpack within the contract
   - Adopted near-standard library & heavy size of the contract
 
 #### Where to modify that Cosmwasm contracts could be compatible on Antelope
 
-The contract system in Antelope seems to be technically well made. But the developers & users are getting lower on Antelope and Cosmwasm-based contracts become treated as a standard in WASM-based contract.
+Despite the contract system in Antelope is sophisticated, the number of developers and users are being flocked to the Cosmwasm-based contracts [(7)](#reference) and they become treated as a standard in WASM-based contracts.
 
 - Support to trigger more exported method on Leap code
-- Using [Serde C++ implementation library](https://github.com/injae/serdepp), serialize the args on Leap and disable ABI creation
+- Using Serde C++ implementation library [(8)](#reference), serialize the args on Leap and disable ABI creation
 - Do not handle the input data within VM, but bypass it into the contract
 - Organize the environmental data & message data and provide them into the contract
 
@@ -153,11 +149,11 @@ The contract system in Antelope seems to be technically well made. But the devel
 - Connection between Antelope Leap <> VM
   - Related part
     - VM connection interface in Leap
-      - runtime_interface.hpp [*(1)*](https://www.notion.so/Report-on-the-feasibility-of-Rust-CDT-implementation-1a787f27e9a54828a5ce6def13112e16)
-      - The implementation is located in runtimes [*(2)*](https://www.notion.so/Report-on-the-feasibility-of-Rust-CDT-implementation-1a787f27e9a54828a5ce6def13112e16) package
+      - runtime_interface.hpp [(9)](#reference)
+      - The implementation is located in runtimes [(10)](#reference)
     - VM backend
       - EOS VM provides the backend APIs so that consumers don’t need to know how the VM is actually working
-      - backend.hpp [*(3)*](https://www.notion.so/Report-on-the-feasibility-of-Rust-CDT-implementation-1a787f27e9a54828a5ce6def13112e16)
+      - backend.hpp [(11)](#reference)
   - Description of each interface
     - `instantiate_module()`
       - Create a context with guaranteeing the distinct pointer by each context
@@ -176,8 +172,8 @@ The contract system in Antelope seems to be technically well made. But the devel
   - Profiler
     - Antelope defines execution time and CPU time as their resource. The amount is set by how much the user stakes, and the execution should be ceased immediately if the execution exceeds the resource the user has.
     - By these reasons, profiling logic should be developed.
-    - While EOSVM was designed with awareness of this demand, Wasmer is not and it is a more general WASM VM, so additional profiling logic is needed on it
-    - As general profiler consumes a lot of system resource, it recommended to build from the scratch.
+    - While EOSVM was designed with awareness of this demand, Wasmer does not contain the feature yet. So, additional profiling logic is needed on it
+    - As general profiler consumes a lot of system resource, it is recommended to build from the scratch.
   - Validation
     - Before store(`setcode`) & execution, Antelope core checks whether the WASM binary is proper or not.
     - Checking criteria
@@ -193,7 +189,7 @@ The contract system in Antelope seems to be technically well made. But the devel
   - In Antelope → VM calling part, do not call via Wasmer API itself but call the backend API above for unifying the way of the implementation.
   - `initialize()`
     - Wasmer C API is prepared. But not yet for C++. `extern "C"` is required
-    - C API *[(4)](https://www.notion.so/Report-on-the-feasibility-of-Rust-CDT-implementation-1a787f27e9a54828a5ce6def13112e16)*
+    - C API [(12)](#reference)
     - Snippet: Connecting engine process
 
       ```cpp
@@ -327,17 +323,17 @@ In the case of enabling CosmWasm-based contracts, the estimated cost is approxim
 
 The timeline is approximately 3 months for development and 2 months for testing and documentation.
 
-In addition, we estimated **USD 40K / yr** for the repository maintenance. This budget would continue before the community’s active contribution, or technical follow-up for other maintenanance entity.
+In addition, we estimated **USD 40K / yr** for the repository maintenance. This budget would continue before the community’s active contribution, or technical follow-up for other maintenance entity.
 
 ### Appendix: Implement Rust CDT following current Antelope CDT
 
-Additionally, we analyzed the existing implementation to understand what more is needed for our subsequent development. The existing Rust CDT project is as follows.\
+Additionally, we analyzed the existing implementation [(13)](#reference) to understand what more is needed for our subsequent development.
+
 The existing Rust CDT project provides a familiar experience for C++ contract developers since it serves quite a similar format to the current C++ CDT. However, there are some points which we can enhance:
 
 - `wasm32-unknown-unknown` is more recommended rather than the current target `wasm32-wasi` for safety, especially automatically blocks system access
 - More maintainers, better stability
-- Manual implementation in codegen may draw difficulty to track and not a general way to compile contract source code, which can deviate from WebAssembly standards
-  - [https://github.com/uuosio/rscdk/blob/main/crates/codegen/src/contract.rs](https://github.com/uuosio/rscdk/blob/main/crates/codegen/src/contract.rs)
+- Manual implementation in codegen may draw difficulty to track and not a general way to compile contract source code, which can deviate from WebAssembly standards [(14)](#reference)
 - A lack of support for a few `eosio` attributes (e.g. `eosio::read_only`) required
 - Integration testing framework and mock VM testing, requiring a fully running chain for testing
 - Few advanced features from CosmWasm SDK. To further explain the reason that the CosmWasm SDK may be a better option:
@@ -347,8 +343,17 @@ The existing Rust CDT project provides a familiar experience for C++ contract de
   - Can adopt many pre-written contract examples from other Cosmwasm contract repositories
 
 ### Reference
-
-1. [https://github.com/AntelopeIO/leap/blob/main/libraries/chain/include/eosio/chain/webassembly/runtime_interface.hpp](https://github.com/AntelopeIO/leap/blob/main/libraries/chain/include/eosio/chain/webassembly/runtime_interface.hpp)
-2. [https://github.com/AntelopeIO/leap/tree/main/libraries/chain/webassembly/runtimes](https://github.com/AntelopeIO/leap/tree/main/libraries/chain/webassembly/runtimes)
-3. [https://github.com/AntelopeIO/eos-vm/blob/main/include/eosio/vm/backend.hpp](https://github.com/AntelopeIO/eos-vm/blob/main/include/eosio/vm/backend.hpp)
-4. [https://github.com/WebAssembly/wasm-c-api/blob/main/include/wasm.h](https://github.com/WebAssembly/wasm-c-api/blob/main/include/wasm.h)
+1. https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/compatibility.rs#L12
+2. https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/wasm_backend/gatekeeper.rs#L64
+3. https://github.com/CosmWasm/cosmwasm/blob/main/packages/vm/src/wasm_backend/gatekeeper.rs#L498
+4. https://github.com/AntelopeIO/eos-vm/blob/main/include/eosio/vm/execution_context.hpp#L287
+5. https://github.com/CosmWasm/wasmvm/blob/main/libwasmvm/src/calls.rs#L488-L528
+6. https://serde.rs
+7. https://medium.com/electric-capital/electric-capital-developer-report-2021-f37874efea6d
+8. https://github.com/injae/serdepp
+9. https://github.com/AntelopeIO/leap/blob/main/libraries/chain/include/eosio/chain/webassembly/runtime_interface.hpp
+10. https://github.com/AntelopeIO/leap/tree/main/libraries/chain/webassembly/runtimes
+11. https://github.com/AntelopeIO/eos-vm/blob/main/include/eosio/vm/backend.hpp
+12. https://github.com/WebAssembly/wasm-c-api/blob/main/include/wasm.h
+13. https://github.com/uuosio/rscdk
+14. https://github.com/uuosio/rscdk/blob/main/crates/codegen/src/contract.rs
